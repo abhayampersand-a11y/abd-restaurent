@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ABD Restaurant — Smart Restaurant Management System
 
-## Getting Started
+A production-grade restaurant platform built on **Next.js 16 (App Router) +
+React 19**, **Neon Postgres + Drizzle ORM**, **NextAuth v5**, Tailwind + shadcn
+(base-nova) UI, and Razorpay/Cloudinary/Resend/Twilio integrations (env-guarded).
 
-First, run the development server:
+> Being built in phases. **Phases 1–3 are complete** (payments, billing &
+> reservations included): project setup, full
+> database schema + migrations + seed, role-based auth, the admin shell, Rooms &
+> Tables management (create/edit/delete, move, **merge**, **transfer**, live
+> floor status), signed per-table **QR**, **menu management** with Cloudinary
+> images, the full **QR customer ordering** flow (cart, item notes, live status +
+> progress bar, favorites, call-waiter, request-bill, add-to-running-order,
+> post-meal ratings), the **Kitchen Display System** (station routing,
+> color-coded live cooking timers, rush flag, sound alerts), and a live
+> **orders board** — realtime via polling.
+
+---
+
+## Tech stack
+
+| Area        | Choice                                                        |
+| ----------- | ------------------------------------------------------------ |
+| Framework   | Next.js 16 (App Router, Server Actions, `proxy` guard)       |
+| Language    | TypeScript (strict)                                          |
+| Database    | Neon Postgres (serverless) + Drizzle ORM + drizzle-kit       |
+| Auth        | NextAuth v5 (Auth.js), Credentials + JWT, role-based         |
+| UI          | Tailwind CSS v4, shadcn/ui (base-nova), lucide-react, dark mode |
+| Charts      | recharts                                                     |
+| QR          | `qrcode` + signed tokens (HMAC-SHA256)                       |
+| Payments    | Razorpay (Phase 3)                                           |
+| Images      | Cloudinary (Phase 2)                                         |
+| Email / SMS | Resend / Twilio (Phase 4, optional)                         |
+
+---
+
+## Prerequisites
+
+- Node.js 20+ (tested on 24)
+- Yarn 4 (repo uses `nodeLinker: node-modules`)
+- A **Neon** Postgres database — grab the *pooled* connection string from
+  <https://console.neon.tech>
+
+---
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Install dependencies
+yarn install
+
+# 2. Configure environment
+cp .env.example .env
+#   then edit .env and paste your Neon DATABASE_URL.
+#   AUTH_SECRET / QR_SIGNING_SECRET / CRON_SECRET are pre-generated for you.
+
+# 3. Create the database schema (choose one)
+yarn db:push          # fast: push schema straight to Neon (great for dev)
+#   — or —
+yarn db:migrate       # apply the generated SQL migrations in ./drizzle
+
+# 4. Seed demo data (staff logins, rooms, tables+QR, menu, inventory)
+yarn db:seed
+
+# 5. Run
+yarn dev              # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Demo logins (created by the seed)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Role    | Email             | Password      |
+| ------- | ----------------- | ------------- |
+| Admin   | admin@abd.test    | `password123` |
+| Manager | manager@abd.test  | `password123` |
+| Chef    | chef@abd.test     | `password123` |
+| Waiter  | waiter@abd.test   | `password123` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Environment variables
 
-To learn more about Next.js, take a look at the following resources:
+See [`.env.example`](./.env.example) for the full list. Essentials:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable            | Required | Notes                                        |
+| ------------------- | -------- | -------------------------------------------- |
+| `DATABASE_URL`      | ✅       | Neon pooled connection string                |
+| `AUTH_SECRET`       | ✅       | `openssl rand -base64 32`                     |
+| `NEXT_PUBLIC_APP_URL` | ✅     | Base URL, used in QR links (`/table/<token>`) |
+| `QR_SIGNING_SECRET` | ✅       | Signs table QR tokens                        |
+| `CRON_SECRET`       | ✅       | Protects the demo-cleanup cron (Phase 5)     |
+| Cloudinary / Razorpay / Resend / Twilio | ⭕ | Optional — features degrade gracefully when unset |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Project structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+  app/
+    (admin)/            # login-required console (shared layout + sidebar)
+      dashboard/  rooms/  orders/  kitchen/  menu/
+      reservations/  inventory/  staff/  reports/  settings/
+    (auth)/login/       # staff sign-in
+    (customer)/table/[qrToken]/   # public QR landing (no login)
+    api/auth/[...nextauth]/       # NextAuth handlers
+  auth.ts               # full NextAuth instance (Credentials + bcrypt)
+  auth.config.ts        # edge-safe config (used by proxy + auth)
+  proxy.ts              # route guard (Next 16's renamed middleware)
+  db/
+    schema.ts           # Drizzle schema (25 tables)
+    index.ts            # lazy Neon client
+    seed.ts             # demo seed
+  lib/
+    qr.ts               # signed QR tokens + table URL
+    auth-helpers.ts     # requireUser / requireRole
+  components/           # shadcn UI + feature components
+drizzle/                # generated SQL migrations
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Database scripts
+
+| Command            | Purpose                              |
+| ------------------ | ------------------------------------ |
+| `yarn db:generate` | Generate SQL migration from schema   |
+| `yarn db:push`     | Push schema directly to the database |
+| `yarn db:migrate`  | Apply migrations                     |
+| `yarn db:seed`     | Seed demo data                       |
+| `yarn db:studio`   | Open Drizzle Studio                  |
+
+---
+
+## Deploy to Vercel
+
+1. Push this repo to GitHub and import it in Vercel.
+2. Add all env vars from `.env.example` in **Project → Settings → Environment
+   Variables** (set `NEXT_PUBLIC_APP_URL` to your production URL).
+3. Run `yarn db:push` (or `db:migrate`) and `yarn db:seed` against your
+   production Neon branch once.
+4. Deploy. The Vercel Cron for Live Demo cleanup is added in Phase 5.
+
+---
+
+## Roadmap
+
+- **Phase 1 ✅** Setup, schema, auth, rooms/tables (+merge/transfer), QR
+- **Phase 2 ✅** Menu management (Cloudinary), QR customer ordering (cart, notes,
+  live status + progress bar, favorites, call-waiter, request-bill,
+  add-to-running-order, ratings), KDS (station routing, color-coded live cooking
+  timers, rush, sound alerts), live orders board — all via polling
+- **Phase 3 ✅** Razorpay payments (pay-from-QR + waiter POS), split bills
+  (even), tips, GST, **coupons/happy-hour**, **loyalty points**, printable
+  receipts; **reservations** (no double-booking) + **waitlist** (notify-when-free)
+  + pre-order; delivery order mode; Resend/Twilio adapters (env-guarded)
+- **Phase 4** Inventory auto-deduct/disable, staff, analytics, notifications
+- **Phase 5** 5-minute self-clearing Live Demo, PWA, polish

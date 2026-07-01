@@ -1,181 +1,86 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboardIcon,
+  ClipboardListIcon,
+  ChefHatIcon,
+  LayoutGridIcon,
+  BookOpenIcon,
+  CalendarCheckIcon,
+  BoxesIcon,
+  UsersIcon,
+  BarChart3Icon,
+  Settings2Icon,
+  CircleHelpIcon,
+  UtensilsCrossedIcon,
+} from "lucide-react";
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+} from "@/components/ui/sidebar";
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "#",
-      icon: (
-        <LayoutDashboardIcon
-        />
-      ),
-    },
-    {
-      title: "Lifecycle",
-      url: "#",
-      icon: (
-        <ListIcon
-        />
-      ),
-    },
-    {
-      title: "Analytics",
-      url: "#",
-      icon: (
-        <ChartBarIcon
-        />
-      ),
-    },
-    {
-      title: "Projects",
-      url: "#",
-      icon: (
-        <FolderIcon
-        />
-      ),
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: (
-        <UsersIcon
-        />
-      ),
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: (
-        <CameraIcon
-        />
-      ),
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: (
-        <CircleHelpIcon
-        />
-      ),
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: (
-        <SearchIcon
-        />
-      ),
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: (
-        <DatabaseIcon
-        />
-      ),
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: (
-        <FileChartColumnIcon
-        />
-      ),
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: (
-        <FileIcon
-        />
-      ),
-    },
-  ],
+type NavItem = { title: string; url: string; icon: React.ReactNode };
+
+const navMain: NavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
+  { title: "Live Orders", url: "/orders", icon: <ClipboardListIcon /> },
+  { title: "Kitchen (KDS)", url: "/kitchen", icon: <ChefHatIcon /> },
+  { title: "Rooms & Tables", url: "/rooms", icon: <LayoutGridIcon /> },
+  { title: "Menu", url: "/menu", icon: <BookOpenIcon /> },
+  { title: "Reservations", url: "/reservations", icon: <CalendarCheckIcon /> },
+  { title: "Inventory", url: "/inventory", icon: <BoxesIcon /> },
+  { title: "Staff", url: "/staff", icon: <UsersIcon /> },
+  { title: "Reports", url: "/reports", icon: <BarChart3Icon /> },
+];
+
+const navSecondary: NavItem[] = [
+  { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
+  { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
+];
+
+type SidebarUser = { name: string; email: string; avatar?: string };
+
+function NavList({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+  return (
+    <SidebarMenu>
+      {items.map((item) => {
+        const active =
+          item.url !== "#" &&
+          (pathname === item.url || pathname.startsWith(`${item.url}/`));
+        return (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton
+              tooltip={item.title}
+              isActive={active}
+              render={<Link href={item.url} />}
+            >
+              {item.icon}
+              <span>{item.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
 }
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user?: SidebarUser }) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -183,22 +88,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               className="data-[slot=sidebar-menu-button]:p-1.5!"
-              render={<a href="#" />}
+              render={<Link href="/dashboard" />}
             >
-              <CommandIcon className="size-5!" />
-              <span className="text-base font-semibold">Acme Inc.</span>
+              <UtensilsCrossedIcon className="size-5!" />
+              <span className="text-base font-semibold">ABD Restaurant</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <SidebarGroup>
+          <SidebarGroupContent className="flex flex-col gap-2">
+            <NavList items={navMain} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <NavList items={navSecondary} />
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: user?.name ?? "Staff",
+            email: user?.email ?? "",
+            avatar: user?.avatar ?? "/avatars/shadcn.jpg",
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

@@ -35,6 +35,7 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaRegister } from "@/components/pwa-register";
+import { MotionProvider } from "@/components/motion/motion-provider";
 import { STORAGE_KEY } from "@/lib/theme-presets";
 
 // Sans
@@ -144,7 +145,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <MotionProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </MotionProvider>
           <Toaster position="bottom-right" />
           <PwaRegister />
         </ThemeProvider>

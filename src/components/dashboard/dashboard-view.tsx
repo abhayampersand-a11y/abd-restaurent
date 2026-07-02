@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
   Area,
   AreaChart,
@@ -24,6 +25,8 @@ import {
 } from "lucide-react";
 
 import { formatINR } from "@/lib/format";
+import { fadeInUp, springSoft, staggerContainer } from "@/lib/motion";
+import { CountUp } from "@/components/motion/count-up";
 import type { DashboardStats } from "@/lib/analytics";
 
 const BAR_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#0ea5e9"];
@@ -47,22 +50,28 @@ export function DashboardView({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={<IndianRupee />} label="Revenue today" value={formatINR(stats.revenueToday)} />
-        <Kpi icon={<ShoppingBag />} label="Orders today" value={String(stats.ordersToday)} />
-        <Kpi icon={<Flame />} label="Active orders" value={String(stats.activeOrders)} accent="text-amber-600" />
+      {/* KPI cards — staggered entrance + hover lift, numbers count up */}
+      <motion.div
+        variants={staggerContainer()}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      >
+        <Kpi icon={<IndianRupee />} label="Revenue today" value={stats.revenueToday} format={(n) => formatINR(n)} />
+        <Kpi icon={<ShoppingBag />} label="Orders today" value={stats.ordersToday} />
+        <Kpi icon={<Flame />} label="Active orders" value={stats.activeOrders} accent="text-amber-600" />
         <Kpi
           icon={<Armchair />}
           label="Occupancy"
-          value={`${stats.occupancyPct}%`}
+          value={stats.occupancyPct}
+          format={(n) => `${Math.round(n)}%`}
           sub={`${stats.tablesOccupied}/${stats.tablesTotal} tables`}
         />
-        <Kpi icon={<Wallet />} label="Avg order value" value={formatINR(stats.avgOrderValue)} />
-        <Kpi icon={<Timer />} label="Avg cook time" value={`${avgCookTime} min`} />
-        <Kpi icon={<Repeat />} label="Repeat rate" value={`${insights.repeatRatePct}%`} />
-        <Kpi icon={<TrendingUp />} label="Avg spend / guest" value={formatINR(insights.avgSpend)} />
-      </div>
+        <Kpi icon={<Wallet />} label="Avg order value" value={stats.avgOrderValue} format={(n) => formatINR(n)} />
+        <Kpi icon={<Timer />} label="Avg cook time" value={avgCookTime} format={(n) => `${n.toFixed(1)} min`} />
+        <Kpi icon={<Repeat />} label="Repeat rate" value={insights.repeatRatePct} format={(n) => `${Math.round(n)}%`} />
+        <Kpi icon={<TrendingUp />} label="Avg spend / guest" value={insights.avgSpend} format={(n) => formatINR(n)} />
+      </motion.div>
 
       {/* Revenue trend */}
       <Card title="Revenue — last 14 days">
@@ -162,33 +171,49 @@ function Kpi({
   icon,
   label,
   value,
+  format,
   sub,
   accent,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: number;
+  format?: (n: number) => string;
   sub?: string;
   accent?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border bg-card p-4">
+    <motion.div
+      variants={fadeInUp}
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      transition={springSoft}
+      className="flex flex-col gap-1 rounded-xl border bg-card p-4"
+    >
       <div className="flex items-center gap-2 text-muted-foreground [&_svg]:size-4">
         {icon}
         <span className="text-xs">{label}</span>
       </div>
-      <span className={`text-2xl font-semibold tabular-nums ${accent ?? ""}`}>{value}</span>
+      <span className={`text-2xl font-semibold tabular-nums ${accent ?? ""}`}>
+        <CountUp value={value} format={format} />
+      </span>
       {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
-    </div>
+    </motion.div>
   );
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <motion.div
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-60px" }}
+      variants={fadeInUp}
+      className="rounded-xl border bg-card p-4"
+    >
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
       {children}
-    </div>
+    </motion.div>
   );
 }
 

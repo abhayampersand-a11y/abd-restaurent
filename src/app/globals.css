@@ -140,3 +140,8 @@
     font-family: var(--font-heading);
   }
 }
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

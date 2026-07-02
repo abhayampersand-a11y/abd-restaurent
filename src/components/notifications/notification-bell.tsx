@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
   Package,
@@ -15,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/format";
+import { dropdown } from "@/lib/motion";
 import { useRealtime } from "@/lib/realtime-client";
 import {
   markAllNotificationsRead,
@@ -95,9 +97,17 @@ export function NotificationBell() {
         )}
       </Button>
 
-      {open && (
-        <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-popover shadow-lg">
-          <div className="flex items-center justify-between border-b p-3">
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            variants={dropdown}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            style={{ transformOrigin: "top right" }}
+            className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-popover shadow-lg"
+          >
+            <div className="flex items-center justify-between border-b p-3">
             <span className="text-sm font-semibold">Notifications</span>
             {unread > 0 && (
               <button onClick={readAll} className="flex items-center gap-1 text-xs text-primary">
@@ -131,8 +141,9 @@ export function NotificationBell() {
               ))
             )}
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

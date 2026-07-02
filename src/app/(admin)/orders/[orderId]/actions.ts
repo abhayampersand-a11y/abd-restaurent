@@ -1,8 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 
+import { db } from "@/db";
+import { orders } from "@/db/schema";
 import { requireRole } from "@/lib/auth-helpers";
+import { emitChange } from "@/lib/realtime-server";
 import {
   confirmOnlinePayment,
   createOnlinePayment,
@@ -11,12 +15,21 @@ import {
   updateBill,
 } from "@/lib/payment-service";
 
+/** Attribute the order to the waiter currently working the bill. */
+async function attribute(orderId: string, userId: string) {
+  await db
+    .update(orders)
+    .set({ handledById: userId })
+    .where(eq(orders.id, orderId));
+}
+
 export type BillActionResult = { ok: boolean; error?: string };
 
-function revalidate(orderId: string) {
+async function revalidate(orderId: string) {
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   revalidatePath("/rooms");
+  await emitChange(["orders", "kds", "notifications"]);
 }
 
 /** Preview a coupon's discount without persisting. */
@@ -47,7 +60,8 @@ export async function payCash(
   amount: number,
   splitLabel?: string,
 ): Promise<BillActionResult> {
-  await requireRole("waiter");
+  const session = await requireRole("waiter");
+  await attribute(orderId, session.user.id);
   await recordCashPayment(orderId, amount, splitLabel);
   revalidate(orderId);
   return { ok: true };
@@ -59,7 +73,8 @@ export async function startOnline(
   amount: number,
   splitLabel?: string,
 ) {
-  await requireRole("waiter");
+  const session = await requireRole("waiter");
+  await attribute(orderId, session.user.id);
   const res = await createOnlinePayment(orderId, amount, "upi", splitLabel);
   revalidate(orderId);
   return res;

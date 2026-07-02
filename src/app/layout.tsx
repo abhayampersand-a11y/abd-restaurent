@@ -29,9 +29,12 @@ import {
 } from "next/font/google";
 import "./globals.css";
 
+import type { Viewport } from "next";
+
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaRegister } from "@/components/pwa-register";
 import { STORAGE_KEY } from "@/lib/theme-presets";
 
 // Sans
@@ -109,8 +112,16 @@ const fontVariables = [
   .join(" ");
 
 export const metadata: Metadata = {
-  title: "ABD Restaurant — Dashboard",
-  description: "Dashboard with a live, shuffle-able theme editor.",
+  title: "ABD Restaurant — Smart Restaurant Management",
+  description:
+    "QR ordering, live kitchen display, tables, billing & analytics for restaurants.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "ABD Restaurant", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 // Runs before hydration so the light/dark class matches the saved theme
@@ -135,6 +146,7 @@ export default function RootLayout({
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
           <Toaster position="bottom-right" />
+          <PwaRegister />
         </ThemeProvider>
       </body>
     </html>

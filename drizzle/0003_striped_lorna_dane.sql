@@ -1,0 +1,1 @@
+ALTER TABLE "demo_sessions" ADD COLUMN "demo_user_id" uuid;

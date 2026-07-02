@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { notifications, reservations, waitlist } from "@/db/schema";
 import { findAvailableTable } from "@/lib/reservations";
 import { sendEmail, sendSMS } from "@/lib/notifications";
+import { getScope, stamp } from "@/lib/scope";
 
 const schema = z.object({
   customerName: z.string().trim().min(1, "Name is required").max(80),
@@ -35,6 +36,8 @@ export async function createReservation(
   if (Number.isNaN(start.getTime()) || start.getTime() < Date.now() - 60_000)
     return { ok: false, error: "Please choose a valid future time." };
 
+  const scope = await getScope();
+  const tag = stamp(scope);
   const tableId = await findAvailableTable(
     d.roomId || null,
     d.partySize,
@@ -49,11 +52,13 @@ export async function createReservation(
       phone: d.phone,
       partySize: d.partySize,
       status: "waiting",
+      ...tag,
     });
     await db.insert(notifications).values({
       type: "reservation",
       title: "🕒 New waitlist entry",
       message: `${d.customerName} · party of ${d.partySize}`,
+      ...tag,
     });
     await sendSMS(
       d.phone,
@@ -79,6 +84,7 @@ export async function createReservation(
       durationMinutes: d.durationMinutes,
       status: "confirmed",
       notes: d.preOrderNote || null,
+      ...tag,
     })
     .returning();
 
@@ -87,6 +93,7 @@ export async function createReservation(
     title: "📅 New reservation",
     message: `${d.customerName} · party of ${d.partySize} · ${start.toLocaleString("en-IN")}`,
     meta: { reservationId: res.id },
+    ...tag,
   });
 
   const confirmMsg = `ABD Restaurant: booking confirmed for ${d.partySize} on ${start.toLocaleString("en-IN")}. See you soon!`;

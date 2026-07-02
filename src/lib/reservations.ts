@@ -1,8 +1,9 @@
 /** Reservation availability helpers (server) — enforces no double-booking. */
-import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { reservations, tables } from "@/db/schema";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 /**
  * True if `tableId` has a confirmed/seated reservation overlapping the window
@@ -15,12 +16,14 @@ export async function hasConflict(
   ignoreId?: string,
 ): Promise<boolean> {
   const end = new Date(start.getTime() + durationMinutes * 60_000);
+  const scope = await getScope();
   const rows = await db
     .select({ id: reservations.id })
     .from(reservations)
     .where(
       and(
         eq(reservations.tableId, tableId),
+        ownerFilter(reservations.sessionId, scope.sessionId),
         inArray(reservations.status, ["confirmed", "seated"]),
         // existing.start < newEnd AND existing.end > newStart
         sql`${reservations.reservedAt} < ${end.toISOString()}`,
@@ -40,12 +43,13 @@ export async function findAvailableTable(
   start: Date,
   durationMinutes: number,
 ): Promise<string | null> {
+  const scope = await getScope();
   const candidates = await db
     .select({ id: tables.id })
     .from(tables)
     .where(
       and(
-        isNull(tables.sessionId),
+        ownerFilter(tables.sessionId, scope.sessionId),
         gte(tables.capacity, partySize),
         roomId ? eq(tables.roomId, roomId) : undefined,
       ),

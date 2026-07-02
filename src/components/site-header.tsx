@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeSettingsPanel } from "@/components/theme/theme-settings-panel"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 export function SiteHeader({ title = "Dashboard" }: { title?: string }) {
   return (
@@ -13,6 +14,7 @@ export function SiteHeader({ title = "Dashboard" }: { title?: string }) {
         />
         <h1 className="text-base font-medium">{title}</h1>
         <div className="ml-auto flex items-center gap-2">
+          <NotificationBell />
           <ThemeSettingsPanel />
         </div>
       </div>

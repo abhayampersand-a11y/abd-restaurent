@@ -1,10 +1,11 @@
-import { asc, isNull } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories as categoriesTable, menuItems as menuItemsTable } from "@/db/schema";
 import { SiteHeader } from "@/components/site-header";
 import { MenuManager } from "@/components/menu/menu-manager";
 import { requireRole } from "@/lib/auth-helpers";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -33,17 +34,18 @@ export type MenuItem = {
 
 export default async function MenuPage() {
   await requireRole("waiter");
+  const scope = await getScope();
 
   const [cats, items] = await Promise.all([
     db
       .select()
       .from(categoriesTable)
-      .where(isNull(categoriesTable.sessionId))
+      .where(ownerFilter(categoriesTable.sessionId, scope.sessionId))
       .orderBy(asc(categoriesTable.sortOrder), asc(categoriesTable.name)),
     db
       .select()
       .from(menuItemsTable)
-      .where(isNull(menuItemsTable.sessionId))
+      .where(ownerFilter(menuItemsTable.sessionId, scope.sessionId))
       .orderBy(asc(menuItemsTable.sortOrder), asc(menuItemsTable.name)),
   ]);
 

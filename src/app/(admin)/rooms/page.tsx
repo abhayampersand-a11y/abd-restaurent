@@ -1,10 +1,11 @@
-import { asc, isNull } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { rooms as roomsTable, tables as tablesTable } from "@/db/schema";
 import { SiteHeader } from "@/components/site-header";
 import { RoomsManager } from "@/components/rooms/rooms-manager";
 import { requireRole } from "@/lib/auth-helpers";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -28,18 +29,19 @@ export type RoomWithTables = {
 
 export default async function RoomsPage() {
   await requireRole("waiter"); // any staff can view the floor
+  const scope = await getScope();
 
-  // Fetch real (non-demo) rooms + tables and nest them.
+  // Fetch rooms + tables for the current scope (real data, or demo session).
   const [roomRows, tableRows] = await Promise.all([
     db
       .select()
       .from(roomsTable)
-      .where(isNull(roomsTable.sessionId))
+      .where(ownerFilter(roomsTable.sessionId, scope.sessionId))
       .orderBy(asc(roomsTable.sortOrder), asc(roomsTable.name)),
     db
       .select()
       .from(tablesTable)
-      .where(isNull(tablesTable.sessionId))
+      .where(ownerFilter(tablesTable.sessionId, scope.sessionId))
       .orderBy(asc(tablesTable.name)),
   ]);
 

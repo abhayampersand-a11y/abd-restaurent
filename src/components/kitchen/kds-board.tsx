@@ -17,8 +17,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCountdown, timeAgo } from "@/lib/format";
-import { POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeTimer, type CookingStatus } from "@/lib/cooking-timer";
+import { useRealtime } from "@/lib/realtime-client";
 import {
   readyItem,
   serveItem,
@@ -109,9 +109,11 @@ export function KdsBoard() {
     }
   }, [beep]);
 
+  // Realtime push on new/changed tickets; slow poll as a safety net.
+  useRealtime("kds", load);
   React.useEffect(() => {
     load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
+    const id = setInterval(load, 20000);
     return () => clearInterval(id);
   }, [load]);
 

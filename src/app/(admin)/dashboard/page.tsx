@@ -1,24 +1,45 @@
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { DataTable } from "@/components/data-table";
-import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { requireUser } from "@/lib/auth-helpers";
+import {
+  getAvgCookTime,
+  getCustomerInsights,
+  getDashboardStats,
+  getPeakHours,
+  getRevenueTrend,
+  getRoomRevenue,
+  getTopDishes,
+} from "@/lib/analytics";
 
-import data from "./data.json";
+export const dynamic = "force-dynamic";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  await requireUser();
+
+  const [stats, trend, topDishes, peakHours, roomRevenue, avgCook, insights] =
+    await Promise.all([
+      getDashboardStats(),
+      getRevenueTrend(14),
+      getTopDishes(6),
+      getPeakHours(),
+      getRoomRevenue(),
+      getAvgCookTime(),
+      getCustomerInsights(),
+    ]);
+
   return (
     <>
       <SiteHeader title="Dashboard" />
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <SectionCards />
-            <div className="px-4 lg:px-6">
-              <ChartAreaInteractive />
-            </div>
-            <DataTable data={data} />
-          </div>
-        </div>
+      <div className="flex flex-1 flex-col p-4 md:p-6">
+        <DashboardView
+          stats={stats}
+          trend={trend}
+          topDishes={topDishes}
+          peakHours={peakHours}
+          roomRevenue={roomRevenue}
+          avgCookTime={avgCook}
+          insights={insights}
+        />
       </div>
     </>
   );

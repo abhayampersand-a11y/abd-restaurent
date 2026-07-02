@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { auditLog, categories, menuItems } from "@/db/schema";
 import { requireRole } from "@/lib/auth-helpers";
+import { getScope, stamp } from "@/lib/scope";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -36,7 +37,11 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   const session = await requireRole("manager");
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message };
-  const [row] = await db.insert(categories).values(parsed.data).returning();
+  const scope = await getScope();
+  const [row] = await db
+    .insert(categories)
+    .values({ ...parsed.data, ...stamp(scope) })
+    .returning();
   await logAudit(session.user.id, "category.create", "categories", row.id);
   return done();
 }
@@ -105,9 +110,10 @@ export async function createMenuItem(formData: FormData): Promise<ActionResult> 
   const session = await requireRole("manager");
   const parsed = itemSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message };
+  const scope = await getScope();
   const [row] = await db
     .insert(menuItems)
-    .values(normaliseItem(parsed.data))
+    .values({ ...normaliseItem(parsed.data), ...stamp(scope) })
     .returning();
   await logAudit(session.user.id, "menu_item.create", "menu_items", row.id);
   return done();

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { orderItems, orders } from "@/db/schema";
 import { requireRole } from "@/lib/auth-helpers";
 import { recomputeOrderStatus } from "@/lib/orders";
+import { emitChange } from "@/lib/realtime-server";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -19,9 +20,10 @@ async function itemOrderId(itemId: string): Promise<string | null> {
   return row?.orderId ?? null;
 }
 
-function done() {
+async function done() {
   revalidatePath("/kitchen");
   revalidatePath("/orders");
+  await emitChange(["kds", "orders"]);
   return { ok: true } as const;
 }
 

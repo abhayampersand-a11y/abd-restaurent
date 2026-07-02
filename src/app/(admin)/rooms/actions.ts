@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
 import { auditLog, orders, rooms, tables } from "@/db/schema";
 import { requireRole } from "@/lib/auth-helpers";
 import { generateQrToken } from "@/lib/qr";
+import { getScope, ownerFilter, stamp } from "@/lib/scope";
 
 /* ----------------------------- validation ----------------------------- */
 
@@ -49,7 +50,11 @@ export async function createRoom(formData: FormData): Promise<ActionResult> {
   if (!parsed.success)
     return { ok: false, error: parsed.error.issues[0]?.message };
 
-  const [row] = await db.insert(rooms).values(parsed.data).returning();
+  const scope = await getScope();
+  const [row] = await db
+    .insert(rooms)
+    .values({ ...parsed.data, ...stamp(scope) })
+    .returning();
   await logAudit(session.user.id, "room.create", "rooms", row.id);
   return done();
 }
@@ -87,9 +92,10 @@ export async function createTable(formData: FormData): Promise<ActionResult> {
   if (!parsed.success)
     return { ok: false, error: parsed.error.issues[0]?.message };
 
+  const scope = await getScope();
   const [row] = await db
     .insert(tables)
-    .values({ ...parsed.data, qrToken: generateQrToken() })
+    .values({ ...parsed.data, qrToken: generateQrToken(), ...stamp(scope) })
     .returning();
   await logAudit(session.user.id, "table.create", "tables", row.id);
   return done();
@@ -196,6 +202,7 @@ export async function transferOrder(
   const session = await requireRole("waiter");
   if (fromTableId === toTableId)
     return { ok: false, error: "Choose a different destination table" };
+  const scope = await getScope();
 
   await db
     .update(orders)
@@ -210,7 +217,7 @@ export async function transferOrder(
           "ready",
           "served",
         ]),
-        isNull(orders.sessionId),
+        ownerFilter(orders.sessionId, scope.sessionId),
       ),
     );
   await db

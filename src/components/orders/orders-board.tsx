@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatINR, timeAgo } from "@/lib/format";
-import { POLL_INTERVAL_MS, STATUS_LABELS } from "@/lib/constants";
+import { STATUS_LABELS } from "@/lib/constants";
+import { useRealtime } from "@/lib/realtime-client";
 import { serveItem } from "@/app/(admin)/kitchen/actions";
 import { markRequestHandled } from "@/app/(admin)/orders/actions";
 
@@ -68,9 +69,10 @@ export function OrdersBoard() {
     }
   }, []);
 
+  useRealtime("orders", load);
   React.useEffect(() => {
     load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
+    const id = setInterval(load, 20000);
     return () => clearInterval(id);
   }, [load]);
 

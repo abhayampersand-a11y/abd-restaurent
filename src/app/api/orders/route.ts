@@ -1,17 +1,21 @@
 /** Live orders feed for the admin/waiter board (+ open customer requests). */
 import { NextResponse } from "next/server";
-import { and, desc, inArray, isNull, eq, sql } from "drizzle-orm";
+import { and, desc, inArray, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { notifications, orderItems, orders, rooms, tables } from "@/db/schema";
 import { auth } from "@/auth";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await getScope();
+  if (!scope.demo) {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const recentOrders = await db
@@ -32,7 +36,7 @@ export async function GET() {
     .leftJoin(rooms, eq(tables.roomId, rooms.id))
     .where(
       and(
-        isNull(orders.sessionId),
+        ownerFilter(orders.sessionId, scope.sessionId),
         inArray(orders.status, [
           "placed",
           "accepted",
@@ -79,6 +83,7 @@ export async function GET() {
       and(
         eq(notifications.type, "system"),
         eq(notifications.isRead, false),
+        ownerFilter(notifications.sessionId, scope.sessionId),
         sql`${notifications.createdAt} > now() - interval '2 hours'`,
       ),
     )

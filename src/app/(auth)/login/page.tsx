@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
-import { UtensilsCrossed, Loader2 } from "lucide-react";
+import { UtensilsCrossed, Loader2, Sparkles } from "lucide-react";
 
 import { authenticate, type LoginState } from "./actions";
+import { startDemo } from "@/app/demo-actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -71,8 +72,21 @@ export default function LoginPage() {
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              Demo: admin@abd.test / password123
+              Demo login: admin@abd.test / password123
             </p>
+          </form>
+
+          <div className="mt-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          {/* Live Demo: spins up a 5-minute isolated sandbox — no signup. */}
+          <form action={startDemo} className="mt-4">
+            <Button type="submit" variant="outline" size="lg" className="w-full">
+              <Sparkles /> Try Live Demo (5 min)
+            </Button>
           </form>
         </CardContent>
       </Card>

@@ -18,9 +18,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatINR, formatCountdown } from "@/lib/format";
-import { ORDER_STEPS, POLL_INTERVAL_MS, STATUS_LABELS } from "@/lib/constants";
+import { ORDER_STEPS, STATUS_LABELS } from "@/lib/constants";
 import { computeTimer, type CookingStatus } from "@/lib/cooking-timer";
 import { openRazorpay } from "@/lib/razorpay-checkout";
+import { useRealtime } from "@/lib/realtime-client";
 import {
   confirmCustomerPayment,
   requestBill,
@@ -65,24 +66,22 @@ export function OrderStatus({ orderId }: { orderId: string }) {
   const [reviewed, setReviewed] = React.useState(false);
   const [paying, startPay] = React.useTransition();
 
-  // Poll the server for status changes.
-  React.useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const res = await fetch(`/api/public/order/${orderId}`, { cache: "no-store" });
-        if (res.ok && active) setData(await res.json());
-      } catch {
-        /* transient */
-      }
+  const load = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/public/order/${orderId}`, { cache: "no-store" });
+      if (res.ok) setData(await res.json());
+    } catch {
+      /* transient */
     }
-    load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
   }, [orderId]);
+
+  // Realtime push on kitchen/payment changes; slow poll as a safety net.
+  useRealtime("orders", load);
+  React.useEffect(() => {
+    load();
+    const id = setInterval(load, 20000);
+    return () => clearInterval(id);
+  }, [load]);
 
   // Local 1s tick so countdowns move smoothly between polls.
   React.useEffect(() => {

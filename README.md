@@ -4,8 +4,7 @@ A production-grade restaurant platform built on **Next.js 16 (App Router) +
 React 19**, **Neon Postgres + Drizzle ORM**, **NextAuth v5**, Tailwind + shadcn
 (base-nova) UI, and Razorpay/Cloudinary/Resend/Twilio integrations (env-guarded).
 
-> Being built in phases. **Phases 1–3 are complete** (payments, billing &
-> reservations included): project setup, full
+> **All 5 phases are complete.** The system is feature-complete: project setup, full
 > database schema + migrations + seed, role-based auth, the admin shell, Rooms &
 > Tables management (create/edit/delete, move, **merge**, **transfer**, live
 > floor status), signed per-table **QR**, **menu management** with Cloudinary
@@ -27,6 +26,7 @@ React 19**, **Neon Postgres + Drizzle ORM**, **NextAuth v5**, Tailwind + shadcn
 | Auth        | NextAuth v5 (Auth.js), Credentials + JWT, role-based         |
 | UI          | Tailwind CSS v4, shadcn/ui (base-nova), lucide-react, dark mode |
 | Charts      | recharts                                                     |
+| Realtime    | **Socket.IO** (custom Next server) — push, with polling fallback |
 | QR          | `qrcode` + signed tokens (HMAC-SHA256)                       |
 | Payments    | Razorpay (Phase 3)                                           |
 | Images      | Cloudinary (Phase 2)                                         |
@@ -151,5 +151,41 @@ drizzle/                # generated SQL migrations
   (even), tips, GST, **coupons/happy-hour**, **loyalty points**, printable
   receipts; **reservations** (no double-booking) + **waitlist** (notify-when-free)
   + pre-order; delivery order mode; Resend/Twilio adapters (env-guarded)
-- **Phase 4** Inventory auto-deduct/disable, staff, analytics, notifications
-- **Phase 5** 5-minute self-clearing Live Demo, PWA, polish
+- **Phase 4 ✅** Inventory (recipe **auto-deduct** on order, low-stock alerts,
+  **auto-disable/enable** dishes, suppliers, purchase orders, wastage/expiry);
+  staff (CRUD, roles, shifts, attendance, **waiter performance**, audit log);
+  **analytics dashboard** (KPIs + charts) and **reports** (margins, peak hours,
+  room revenue, repeat rate, CSV/PDF export); **notifications center** (bell)
+- **Phase 5 ✅** 5-minute self-clearing **Live Demo** (isolated per-session
+  sandbox, countdown banner, auto-purge via **Vercel Cron**, strict data
+  isolation from real data) and **PWA** (installable, offline fallback)
+
+## Realtime (Socket.IO)
+
+Live surfaces — **KDS**, the **orders board**, the customer **order-status** page,
+and the **notification bell** — update via **WebSocket push** instead of waiting on
+polling. A custom Next server ([`server.mjs`](server.mjs)) attaches a Socket.IO
+server; Server Actions emit `changed` events through
+[`realtime-server.ts`](src/lib/realtime-server.ts) and clients refetch via the
+[`useRealtime`](src/lib/realtime-client.ts) hook. Socket rooms mirror the
+data-scope isolation (`real` vs `demo:<sessionId>`), and every client keeps a slow
+poll as a fallback.
+
+> **Run it with `yarn dev` / `yarn start`** — both boot `server.mjs`. (`yarn
+> dev:next` runs the plain Next dev server without sockets.)
+>
+> **Deployment:** WebSockets need a persistent Node process, so deploy to a Node
+> host (Render, Railway, Fly, a VPS, or any container) rather than Vercel
+> serverless. On Vercel, either run this as a Node service or swap the socket
+> layer for a managed realtime provider (Pusher/Ably) — the app still works
+> there via the polling fallback.
+
+## Live Demo mode
+
+Click **“Try Live Demo (5 min)”** on `/login`. This seeds an isolated sandbox
+(demo rooms, tables + QR, menu, a running order, inventory), sets a
+demo-session cookie, and grants full admin access for 5 minutes without signup.
+Every demo row is tagged with a `session_id` + `expires_at`; a Vercel Cron
+(`/api/cron/purge-demo`, every minute — see `vercel.json`) deletes expired demo
+data. Real data (`session_id IS NULL`) is never touched, and demo visitors only
+ever see their own session. Tune the length with `DEMO_SESSION_MINUTES`.

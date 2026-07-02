@@ -1,0 +1,19 @@
+{
+  "name": "ABD Restaurant",
+  "short_name": "ABD",
+  "description": "Smart Restaurant Management System — orders, kitchen, tables, billing.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

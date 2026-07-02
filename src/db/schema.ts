@@ -281,6 +281,10 @@ export const orders = pgTable(
     tableId: uuid("table_id").references(() => tables.id, {
       onDelete: "set null",
     }),
+    /** Waiter who worked the bill (for performance analytics). */
+    handledById: uuid("handled_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     mode: orderMode("mode").notNull().default("dine_in"),
     status: orderStatus("status").notNull().default("placed"),
     customerName: text("customer_name"),
@@ -682,6 +686,8 @@ export const demoSessions = pgTable(
   "demo_sessions",
   {
     id: text("id").primaryKey(),
+    /** The auto-created demo admin user for this session. */
+    demoUserId: uuid("demo_user_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

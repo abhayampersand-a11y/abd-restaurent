@@ -1,20 +1,24 @@
 /** Live KDS feed — active orders + their unfinished items. Chef+ only. */
 import { NextResponse } from "next/server";
-import { and, asc, inArray, isNull, eq } from "drizzle-orm";
+import { and, asc, inArray, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orderItems, orders, rooms, tables } from "@/db/schema";
 import { auth } from "@/auth";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await getScope();
+  if (!scope.demo) {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
-  // Active orders (not served/completed/cancelled), real data only.
+  // Active orders (not served/completed/cancelled) for the current scope.
   const activeOrders = await db
     .select({
       id: orders.id,
@@ -32,7 +36,7 @@ export async function GET() {
     .leftJoin(rooms, eq(tables.roomId, rooms.id))
     .where(
       and(
-        isNull(orders.sessionId),
+        ownerFilter(orders.sessionId, scope.sessionId),
         inArray(orders.status, ["placed", "accepted", "cooking", "ready"]),
       ),
     )

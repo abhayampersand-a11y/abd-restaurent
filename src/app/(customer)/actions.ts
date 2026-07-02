@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -15,6 +15,9 @@ import {
 } from "@/db/schema";
 import { verifyQrToken } from "@/lib/qr";
 import { computeTotals, generateOrderNumber, recomputeOrderStatus } from "@/lib/orders";
+import { applyInventoryForOrder } from "@/lib/inventory";
+import { getScope, ownerFilter, stamp, type Scope } from "@/lib/scope";
+import { emitChange } from "@/lib/realtime-server";
 import {
   confirmOnlinePayment,
   createOnlinePayment,
@@ -50,12 +53,13 @@ export type OrderResult =
  */
 async function buildOrderItems(
   lines: z.infer<typeof cartItemSchema>[],
+  scope: Scope,
 ) {
   const ids = [...new Set(lines.map((l) => l.menuItemId))];
   const rows = await db
     .select()
     .from(menuItems)
-    .where(and(inArray(menuItems.id, ids), isNull(menuItems.sessionId)));
+    .where(and(inArray(menuItems.id, ids), ownerFilter(menuItems.sessionId, scope.sessionId)));
 
   const byId = new Map(rows.map((r) => [r.id, r]));
   const built: {
@@ -97,14 +101,15 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderResult> {
   if (!verifyQrToken(data.qrToken))
     return { ok: false, error: "Invalid table code." };
 
+  const scope = await getScope();
   const [table] = await db
     .select({ id: tables.id })
     .from(tables)
-    .where(and(eq(tables.qrToken, data.qrToken), isNull(tables.sessionId)))
+    .where(and(eq(tables.qrToken, data.qrToken), ownerFilter(tables.sessionId, scope.sessionId)))
     .limit(1);
   if (!table) return { ok: false, error: "Table not found." };
 
-  const result = await buildOrderItems(data.items);
+  const result = await buildOrderItems(data.items, scope);
   if (!result.ok) return { ok: false, error: result.error };
 
   const totals = computeTotals(
@@ -125,11 +130,12 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderResult> {
       subtotal: String(totals.subtotal),
       tax: String(totals.tax),
       total: String(totals.total),
+      ...stamp(scope),
     })
     .returning();
 
   await db.insert(orderItems).values(
-    result.built.map((b) => ({ ...b, orderId: order.id })),
+    result.built.map((b) => ({ ...b, orderId: order.id, ...stamp(scope) })),
   );
 
   if (data.mode === "dine_in") {
@@ -145,8 +151,26 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderResult> {
     title: `New order ${order.orderNumber}`,
     message: `${result.built.length} item(s) • ${totals.total}`,
     meta: { orderId: order.id },
+    ...stamp(scope),
   });
 
+  // Big-order alert for managers.
+  if (totals.total >= 1500) {
+    await db.insert(notifications).values({
+      type: "big_order",
+      title: `💰 Big order ${order.orderNumber}`,
+      message: `Total ₹${totals.total} — ${result.built.length} items`,
+      meta: { orderId: order.id },
+      ...stamp(scope),
+    });
+  }
+
+  // Deduct ingredients, auto-disable out-of-stock dishes, raise low-stock alerts.
+  await applyInventoryForOrder(
+    result.built.map((b) => ({ menuItemId: b.menuItemId, quantity: b.quantity })),
+  );
+
+  await emitChange(["kds", "orders", "notifications"]);
   return { ok: true, orderId: order.id, orderNumber: order.orderNumber };
 }
 
@@ -158,6 +182,7 @@ export async function addToOrder(
   const parsedItems = z.array(cartItemSchema).min(1).safeParse(items);
   if (!parsedItems.success) return { ok: false, error: "Cart is empty" };
 
+  const scope = await getScope();
   const [order] = await db
     .select()
     .from(orders)
@@ -167,11 +192,15 @@ export async function addToOrder(
   if (["completed", "cancelled", "served"].includes(order.status))
     return { ok: false, error: "This order is closed." };
 
-  const result = await buildOrderItems(parsedItems.data);
+  const result = await buildOrderItems(parsedItems.data, scope);
   if (!result.ok) return { ok: false, error: result.error };
 
   await db.insert(orderItems).values(
-    result.built.map((b) => ({ ...b, orderId })),
+    result.built.map((b) => ({ ...b, orderId, ...stamp(scope) })),
+  );
+
+  await applyInventoryForOrder(
+    result.built.map((b) => ({ menuItemId: b.menuItemId, quantity: b.quantity })),
   );
 
   // Recompute totals across ALL items on the order.
@@ -193,6 +222,7 @@ export async function addToOrder(
     .where(eq(orders.id, orderId));
 
   await recomputeOrderStatus(orderId);
+  await emitChange(["kds", "orders"]);
   return { ok: true, orderId, orderNumber: order.orderNumber };
 }
 
@@ -205,12 +235,15 @@ export async function callWaiter(qrToken: string): Promise<{ ok: boolean }> {
     .where(eq(tables.qrToken, qrToken))
     .limit(1);
   if (!table) return { ok: false };
+  const scope = await getScope();
   await db.insert(notifications).values({
     type: "system",
     title: `🔔 Call waiter — Table ${table.name}`,
     message: "Customer requested assistance.",
     meta: { tableId: table.id },
+    ...stamp(scope),
   });
+  await emitChange(["orders", "notifications"]);
   return { ok: true };
 }
 
@@ -222,12 +255,15 @@ export async function requestBill(orderId: string): Promise<{ ok: boolean }> {
     .where(eq(orders.id, orderId))
     .limit(1);
   if (!order) return { ok: false };
+  const scope = await getScope();
   await db.insert(notifications).values({
     type: "system",
     title: `🧾 Bill requested — ${order.orderNumber}`,
     message: "Customer requested the bill.",
     meta: { orderId },
+    ...stamp(scope),
   });
+  await emitChange(["orders", "notifications"]);
   return { ok: true };
 }
 
@@ -248,7 +284,9 @@ export async function confirmCustomerPayment(
   razorpayPaymentId: string,
   signature: string,
 ) {
-  return confirmOnlinePayment(paymentId, razorpayPaymentId, signature);
+  const res = await confirmOnlinePayment(paymentId, razorpayPaymentId, signature);
+  await emitChange(["orders", "notifications"]);
+  return res;
 }
 
 /* --------------------------- reviews / feedback ----------------------- */
@@ -268,6 +306,8 @@ export async function submitReview(
   const parsed = reviewSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid feedback" };
   const { orderId, serviceRating, comment, dishes } = parsed.data;
+  const scope = await getScope();
+  const tag = stamp(scope);
 
   // Overall service review row.
   await db.insert(reviews).values({
@@ -275,6 +315,7 @@ export async function submitReview(
     rating: serviceRating,
     serviceRating,
     comment: comment || null,
+    ...tag,
   });
 
   // Per-dish ratings.
@@ -284,12 +325,13 @@ export async function submitReview(
         orderId,
         menuItemId: d.menuItemId,
         rating: d.rating,
+        ...tag,
       })),
     );
   }
 
   if (comment) {
-    await db.insert(feedback).values({ orderId, message: comment, rating: serviceRating });
+    await db.insert(feedback).values({ orderId, message: comment, rating: serviceRating, ...tag });
   }
 
   // Low rating -> alert admins.
@@ -299,7 +341,9 @@ export async function submitReview(
       title: "⚠️ Negative review received",
       message: comment || `Service rated ${serviceRating}/5`,
       meta: { orderId },
+      ...tag,
     });
+    await emitChange(["notifications"]);
   }
 
   return { ok: true };

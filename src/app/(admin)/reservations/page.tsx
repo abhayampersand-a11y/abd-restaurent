@@ -1,15 +1,17 @@
-import { and, asc, desc, gte, inArray, isNull, eq } from "drizzle-orm";
+import { and, asc, desc, gte, inArray, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { reservations, rooms, tables, waitlist } from "@/db/schema";
 import { SiteHeader } from "@/components/site-header";
 import { ReservationsAdmin } from "@/components/reservations/reservations-admin";
 import { requireRole } from "@/lib/auth-helpers";
+import { getScope, ownerFilter } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReservationsPage() {
   await requireRole("waiter");
+  const scope = await getScope();
 
   const since = new Date(Date.now() - 6 * 60 * 60 * 1000); // include last 6h
 
@@ -31,7 +33,7 @@ export default async function ReservationsPage() {
       .from(reservations)
       .leftJoin(tables, eq(reservations.tableId, tables.id))
       .leftJoin(rooms, eq(tables.roomId, rooms.id))
-      .where(and(isNull(reservations.sessionId), gte(reservations.reservedAt, since)))
+      .where(and(ownerFilter(reservations.sessionId, scope.sessionId), gte(reservations.reservedAt, since)))
       .orderBy(asc(reservations.reservedAt)),
     db
       .select({
@@ -42,12 +44,12 @@ export default async function ReservationsPage() {
       })
       .from(tables)
       .leftJoin(rooms, eq(tables.roomId, rooms.id))
-      .where(isNull(tables.sessionId))
+      .where(ownerFilter(tables.sessionId, scope.sessionId))
       .orderBy(asc(tables.name)),
     db
       .select()
       .from(waitlist)
-      .where(and(isNull(waitlist.sessionId), inArray(waitlist.status, ["waiting", "notified"])))
+      .where(and(ownerFilter(waitlist.sessionId, scope.sessionId), inArray(waitlist.status, ["waiting", "notified"])))
       .orderBy(desc(waitlist.createdAt)),
   ]);
 

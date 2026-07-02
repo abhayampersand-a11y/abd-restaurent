@@ -54,7 +54,11 @@ export const authConfig = {
         (p) => pathname === p || pathname.startsWith(`${p}/`),
       );
       if (!isProtected) return true; // public: customer QR, /login, /, api/public
-      return !!auth?.user; // redirects to /login when false
+      if (auth?.user) return true;
+      // Live Demo visitors are allowed in; server guards validate the session
+      // and route stale demos to /demo-expired.
+      if (request.cookies.get("demo_session")) return true;
+      return false; // redirects to /login
     },
   },
 } satisfies NextAuthConfig;

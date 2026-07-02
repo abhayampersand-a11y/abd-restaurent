@@ -1,6 +1,8 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { requireUser } from "@/lib/auth-helpers";
+import { getScope } from "@/lib/scope";
+import { DemoBanner } from "@/components/demo/demo-banner";
 
 /**
  * Shell for the entire admin console. Enforces authentication (via
@@ -13,6 +15,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await requireUser();
+  const scope = await getScope();
 
   return (
     <SidebarProvider
@@ -31,7 +34,12 @@ export default async function AdminLayout({
           avatar: session.user.image ?? undefined,
         }}
       />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset>
+        {scope.demo && scope.expiresAt && (
+          <DemoBanner expiresAt={scope.expiresAt.toISOString()} />
+        )}
+        {children}
+      </SidebarInset>
     </SidebarProvider>
   );
 }

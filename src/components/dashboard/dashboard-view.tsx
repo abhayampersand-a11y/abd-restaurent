@@ -215,7 +215,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       {children}
     </motion.div>
   );
-}
+} 
 
 function Empty() {
   return (
